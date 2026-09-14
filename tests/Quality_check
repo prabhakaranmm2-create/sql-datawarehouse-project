@@ -1,0 +1,556 @@
+```sql
+/*
+================================================================================
+Project       : Data Warehouse
+Layer         : Silver Layer
+Script        : Silver Layer Data Quality Checks
+Description   : Performs data quality validation checks on all Silver layer
+                tables after the Silver layer load process.
+
+Purpose       :
+                - Validate NULL and missing values
+                - Identify duplicate records
+                - Validate business rules and standardized values
+                - Validate dates and date relationships
+                - Validate numeric measures
+                - Identify invalid or unexpected source values
+                - Validate consistency between related Silver tables
+                - Provide visibility into potential data quality issues
+
+Tables Checked:
+                1. silver.crm_cust_info
+                2. silver.crm_prd_info
+                3. silver.crm_sales_details
+                4. silver.erp_cust_az12
+                5. silver.erp_loc_a101
+                6. silver.erp_px_cat_g1v2
+
+Execution     :
+                Run this script after executing:
+                EXEC silver.load_silver;
+
+Result        :
+                Queries return records that fail the respective quality check.
+                An empty result set generally indicates that no issue was found
+                for that particular check.
+
+Load Type     : Full Load
+Version       : 1.0
+================================================================================
+*/
+
+
+/*
+================================================================================
+1. CRM CUSTOMER INFORMATION
+   Table: silver.crm_cust_info
+================================================================================
+*/
+
+-- Check 1.1: NULL Customer IDs
+SELECT *
+FROM silver.crm_cust_info
+WHERE cst_id IS NULL;
+
+
+-- Check 1.2: Duplicate Customer IDs
+SELECT 
+    cst_id,
+    COUNT(*) AS duplicate_count
+FROM silver.crm_cust_info
+GROUP BY cst_id
+HAVING COUNT(*) > 1;
+
+
+-- Check 1.3: NULL Customer Keys
+SELECT *
+FROM silver.crm_cust_info
+WHERE cst_key IS NULL
+   OR TRIM(cst_key) = '';
+
+
+-- Check 1.4: NULL Customer First Names
+SELECT *
+FROM silver.crm_cust_info
+WHERE cst_firstname IS NULL
+   OR TRIM(cst_firstname) = '';
+
+
+-- Check 1.5: NULL Customer Last Names
+SELECT *
+FROM silver.crm_cust_info
+WHERE cst_lastname IS NULL
+   OR TRIM(cst_lastname) = '';
+
+
+-- Check 1.6: Invalid Marital Status
+SELECT *
+FROM silver.crm_cust_info
+WHERE cst_marital_status NOT IN ('Married', 'Single', 'n/a')
+   OR cst_marital_status IS NULL;
+
+
+-- Check 1.7: Invalid Gender
+SELECT *
+FROM silver.crm_cust_info
+WHERE cst_gndr NOT IN ('Male', 'Female', 'n/a')
+   OR cst_gndr IS NULL;
+
+
+-- Check 1.8: Future Customer Creation Dates
+SELECT *
+FROM silver.crm_cust_info
+WHERE cst_create_date > CAST(GETDATE() AS DATE);
+
+
+-- Check 1.9: Audit Date Validation
+SELECT *
+FROM silver.crm_cust_info
+WHERE dwh_create_date IS NULL;
+
+
+
+/*
+================================================================================
+2. CRM PRODUCT INFORMATION
+   Table: silver.crm_prd_info
+================================================================================
+*/
+
+-- Check 2.1: NULL Product IDs
+SELECT *
+FROM silver.crm_prd_info
+WHERE prd_id IS NULL;
+
+
+-- Check 2.2: Duplicate Product IDs
+SELECT 
+    prd_id,
+    COUNT(*) AS duplicate_count
+FROM silver.crm_prd_info
+GROUP BY prd_id
+HAVING COUNT(*) > 1;
+
+
+-- Check 2.3: NULL Product Keys
+SELECT *
+FROM silver.crm_prd_info
+WHERE prd_key IS NULL
+   OR TRIM(prd_key) = '';
+
+
+-- Check 2.4: NULL Product Names
+SELECT *
+FROM silver.crm_prd_info
+WHERE prd_nm IS NULL
+   OR TRIM(prd_nm) = '';
+
+
+-- Check 2.5: Invalid Product Cost
+SELECT *
+FROM silver.crm_prd_info
+WHERE prd_cost < 0
+   OR prd_cost IS NULL;
+
+
+-- Check 2.6: Invalid Product Line
+SELECT *
+FROM silver.crm_prd_info
+WHERE prd_line NOT IN ('Mountain', 'Road', 'other Sales', 'Touring', 'n/a')
+   OR prd_line IS NULL;
+
+
+-- Check 2.7: NULL Product Start Date
+SELECT *
+FROM silver.crm_prd_info
+WHERE prd_start_dt IS NULL;
+
+
+-- Check 2.8: Product End Date Before Start Date
+SELECT *
+FROM silver.crm_prd_info
+WHERE prd_end_dt IS NOT NULL
+  AND prd_end_dt < prd_start_dt;
+
+
+-- Check 2.9: Future Product Start Dates
+SELECT *
+FROM silver.crm_prd_info
+WHERE prd_start_dt > CAST(GETDATE() AS DATE);
+
+
+-- Check 2.10: NULL Audit Date
+SELECT *
+FROM silver.crm_prd_info
+WHERE dwh_create_date IS NULL;
+
+
+
+/*
+================================================================================
+3. CRM SALES DETAILS
+   Table: silver.crm_sales_details
+================================================================================
+*/
+
+-- Check 3.1: NULL Order Numbers
+SELECT *
+FROM silver.crm_sales_details
+WHERE sls_ord_num IS NULL
+   OR TRIM(sls_ord_num) = '';
+
+
+-- Check 3.2: NULL Product Keys
+SELECT *
+FROM silver.crm_sales_details
+WHERE sls_prd_key IS NULL
+   OR TRIM(sls_prd_key) = '';
+
+
+-- Check 3.3: NULL Customer IDs
+SELECT *
+FROM silver.crm_sales_details
+WHERE sls_cust_id IS NULL;
+
+
+-- Check 3.4: Duplicate Sales Records
+SELECT 
+    sls_ord_num,
+    sls_prd_key,
+    sls_cust_id,
+    COUNT(*) AS duplicate_count
+FROM silver.crm_sales_details
+GROUP BY 
+    sls_ord_num,
+    sls_prd_key,
+    sls_cust_id
+HAVING COUNT(*) > 1;
+
+
+-- Check 3.5: NULL Order Dates
+SELECT *
+FROM silver.crm_sales_details
+WHERE sls_order_dt IS NULL;
+
+
+-- Check 3.6: NULL Ship Dates
+SELECT *
+FROM silver.crm_sales_details
+WHERE sls_ship_dt IS NULL;
+
+
+-- Check 3.7: NULL Due Dates
+SELECT *
+FROM silver.crm_sales_details
+WHERE sls_due_dt IS NULL;
+
+
+-- Check 3.8: Invalid Date Sequence
+SELECT *
+FROM silver.crm_sales_details
+WHERE sls_order_dt > sls_ship_dt
+   OR sls_ship_dt > sls_due_dt;
+
+
+-- Check 3.9: Invalid Sales Amount
+SELECT *
+FROM silver.crm_sales_details
+WHERE sls_sales IS NULL
+   OR sls_sales <= 0;
+
+
+-- Check 3.10: Invalid Quantity
+SELECT *
+FROM silver.crm_sales_details
+WHERE sls_quantity IS NULL
+   OR sls_quantity <= 0;
+
+
+-- Check 3.11: Invalid Price
+SELECT *
+FROM silver.crm_sales_details
+WHERE sls_price IS NULL
+   OR sls_price <= 0;
+
+
+-- Check 3.12: Sales Amount Calculation Validation
+SELECT *
+FROM silver.crm_sales_details
+WHERE sls_sales <> sls_quantity * ABS(sls_price);
+
+
+-- Check 3.13: Future Sales Order Dates
+SELECT *
+FROM silver.crm_sales_details
+WHERE sls_order_dt > CAST(GETDATE() AS DATE);
+
+
+-- Check 3.14: NULL Audit Date
+SELECT *
+FROM silver.crm_sales_details
+WHERE dwh_create_date IS NULL;
+
+
+
+/*
+================================================================================
+4. ERP CUSTOMER INFORMATION
+   Table: silver.erp_cust_az12
+================================================================================
+*/
+
+-- Check 4.1: NULL Customer IDs
+SELECT *
+FROM silver.erp_cust_az12
+WHERE cid IS NULL
+   OR TRIM(cid) = '';
+
+
+-- Check 4.2: Duplicate Customer IDs
+SELECT 
+    cid,
+    COUNT(*) AS duplicate_count
+FROM silver.erp_cust_az12
+GROUP BY cid
+HAVING COUNT(*) > 1;
+
+
+-- Check 4.3: Customer IDs Still Containing NAS Prefix
+SELECT *
+FROM silver.erp_cust_az12
+WHERE cid LIKE 'NAS%';
+
+
+-- Check 4.4: Future Birth Dates
+SELECT *
+FROM silver.erp_cust_az12
+WHERE bdate > CAST(GETDATE() AS DATE);
+
+
+-- Check 4.5: Invalid Gender
+SELECT *
+FROM silver.erp_cust_az12
+WHERE gen NOT IN ('Male', 'Female', 'n/a')
+   OR gen IS NULL;
+
+
+-- Check 4.6: NULL Audit Date
+SELECT *
+FROM silver.erp_cust_az12
+WHERE dwh_create_date IS NULL;
+
+
+
+/*
+================================================================================
+5. ERP LOCATION INFORMATION
+   Table: silver.erp_loc_a101
+================================================================================
+*/
+
+-- Check 5.1: NULL Customer IDs
+SELECT *
+FROM silver.erp_loc_a101
+WHERE cid IS NULL
+   OR TRIM(cid) = '';
+
+
+-- Check 5.2: Duplicate Customer IDs
+SELECT 
+    cid,
+    COUNT(*) AS duplicate_count
+FROM silver.erp_loc_a101
+GROUP BY cid
+HAVING COUNT(*) > 1;
+
+
+-- Check 5.3: Customer IDs Containing Hyphens
+SELECT *
+FROM silver.erp_loc_a101
+WHERE cid LIKE '%-%';
+
+
+-- Check 5.4: NULL or Empty Country
+SELECT *
+FROM silver.erp_loc_a101
+WHERE cntry IS NULL
+   OR TRIM(cntry) = '';
+
+
+-- Check 5.5: Check Standardized Country Values
+SELECT DISTINCT cntry
+FROM silver.erp_loc_a101
+ORDER BY cntry;
+
+
+-- Check 5.6: NULL Audit Date
+SELECT *
+FROM silver.erp_loc_a101
+WHERE dwh_create_date IS NULL;
+
+
+
+/*
+================================================================================
+6. ERP PRODUCT CATEGORY INFORMATION
+   Table: silver.erp_px_cat_g1v2
+================================================================================
+*/
+
+-- Check 6.1: NULL Category IDs
+SELECT *
+FROM silver.erp_px_cat_g1v2
+WHERE id IS NULL
+   OR TRIM(id) = '';
+
+
+-- Check 6.2: Duplicate Category IDs
+SELECT 
+    id,
+    COUNT(*) AS duplicate_count
+FROM silver.erp_px_cat_g1v2
+GROUP BY id
+HAVING COUNT(*) > 1;
+
+
+-- Check 6.3: NULL Category
+SELECT *
+FROM silver.erp_px_cat_g1v2
+WHERE cat IS NULL
+   OR TRIM(cat) = '';
+
+
+-- Check 6.4: NULL Subcategory
+SELECT *
+FROM silver.erp_px_cat_g1v2
+WHERE subcat IS NULL
+   OR TRIM(subcat) = '';
+
+
+-- Check 6.5: NULL Maintenance Value
+SELECT *
+FROM silver.erp_px_cat_g1v2
+WHERE maintenance IS NULL
+   OR TRIM(maintenance) = '';
+
+
+-- Check 6.6: Check Distinct Category Values
+SELECT DISTINCT cat
+FROM silver.erp_px_cat_g1v2
+ORDER BY cat;
+
+
+-- Check 6.7: Check Distinct Maintenance Values
+SELECT DISTINCT maintenance
+FROM silver.erp_px_cat_g1v2
+ORDER BY maintenance;
+
+
+-- Check 6.8: NULL Audit Date
+SELECT *
+FROM silver.erp_px_cat_g1v2
+WHERE dwh_create_date IS NULL;
+
+
+
+/*
+================================================================================
+7. CROSS-TABLE DATA QUALITY CHECKS
+================================================================================
+*/
+
+-- Check 7.1: Sales Records with Customer IDs
+-- that do not exist in CRM Customer Information
+SELECT s.*
+FROM silver.crm_sales_details s
+LEFT JOIN silver.crm_cust_info c
+    ON s.sls_cust_id = c.cst_id
+WHERE c.cst_id IS NULL;
+
+
+-- Check 7.2: Sales Records with Product Keys
+-- that do not exist in CRM Product Information
+SELECT s.*
+FROM silver.crm_sales_details s
+LEFT JOIN silver.crm_prd_info p
+    ON s.sls_prd_key = p.prd_key
+WHERE p.prd_key IS NULL;
+
+
+-- Check 7.3: ERP Customer IDs without Location Information
+SELECT c.*
+FROM silver.erp_cust_az12 c
+LEFT JOIN silver.erp_loc_a101 l
+    ON c.cid = l.cid
+WHERE l.cid IS NULL;
+
+
+-- Check 7.4: CRM Customer IDs without ERP Customer Information
+SELECT c.*
+FROM silver.crm_cust_info c
+LEFT JOIN silver.erp_cust_az12 e
+    ON c.cst_key = e.cid
+WHERE e.cid IS NULL;
+
+
+-- Check 7.5: Product Category IDs without Category Master Data
+SELECT p.*
+FROM silver.crm_prd_info p
+LEFT JOIN silver.erp_px_cat_g1v2 c
+    ON p.cat_id = c.id
+WHERE c.id IS NULL;
+
+
+
+/*
+================================================================================
+8. RECORD COUNT VALIDATION
+================================================================================
+*/
+
+SELECT 'silver.crm_cust_info' AS table_name,
+       COUNT(*) AS record_count
+FROM silver.crm_cust_info
+
+UNION ALL
+
+SELECT 'silver.crm_prd_info',
+       COUNT(*)
+FROM silver.crm_prd_info
+
+UNION ALL
+
+SELECT 'silver.crm_sales_details',
+       COUNT(*)
+FROM silver.crm_sales_details
+
+UNION ALL
+
+SELECT 'silver.erp_cust_az12',
+       COUNT(*)
+FROM silver.erp_cust_az12
+
+UNION ALL
+
+SELECT 'silver.erp_loc_a101',
+       COUNT(*)
+FROM silver.erp_loc_a101
+
+UNION ALL
+
+SELECT 'silver.erp_px_cat_g1v2',
+       COUNT(*)
+FROM silver.erp_px_cat_g1v2;
+
+
+/*
+================================================================================
+9. SILVER LAYER QUALITY CHECK COMPLETED
+================================================================================
+*/
+
+PRINT '====================================================';
+PRINT 'Silver Layer Data Quality Checks Completed';
+PRINT 'Review the result sets above for potential data quality issues.';
+PRINT '====================================================';
+```
