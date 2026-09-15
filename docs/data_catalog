@@ -1,0 +1,22 @@
+Data Catalog Update:
+
+Created Bronze Layer Tables:
+- bronze.crm_cust_info: Raw customer information
+- bronze.crm_prd_info: Raw product details
+- bronze.crm_sales_details: Raw sales transactions
+- bronze.erp_cust_az12: ERP customer demographics
+- bronze.erp_loc_a101: ERP customer location data
+- bronze.erp_px_cat_g1v2: ERP product category hierarchy
+
+Created Silver Layer Tables (with dwh_create_date for lineage):
+- silver.crm_cust_info: Cleansed customer information
+- silver.crm_prd_info: Cleansed product details
+- silver.crm_sales_details: Cleansed sales transactions
+- silver.erp_cust_az12: Standardized ERP customer demographics
+- silver.erp_loc_a101: Standardized ERP customer location data
+- silver.erp_px_cat_g1v2: Standardized ERP product category hierarchy
+
+Purpose:
+- Establish raw (bronze) and cleansed (silver) schemas for CRM & ERP data.
+- Enable downstream analytics and reporting with consistent metadata.
+- Ensure lineage tracking via dwh_create_date in silver tables.
